@@ -1,7 +1,7 @@
 import dropbox
 
 access_token = 'xxx'#put your acces token here
-files_to_sync = ['./test22.txt', './test2.txt', './test3.txt', './test/nocheintest/eintest.txt']
+files_to_sync = ['./test22.txt', './test2.txt', './test3.txt', './test/nocheintest/eintest.txt'] # just some data to upload and sync
 default_location = "/files" #without '/' at the end!
 # file_to = '/dev_test/test.txt'  # The full path to upload the file to, including the file name
 
