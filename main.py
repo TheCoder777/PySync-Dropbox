@@ -1,93 +1,159 @@
 import dropbox
-
-access_token = 'xxx'#put your acces token here
-files_to_sync = ['./test22.txt', './test2.txt', './test3.txt', './test/nocheintest/eintest.txt'] # just some data to upload and sync
-default_location = "/files" #without '/' at the end!
+import os.path as ospath
+# access_token = 'xxx' #put your acces token here
+# files_to_sync = ['./test22.txt', './test2.txt', './test3.txt', './test/nocheintest/eintest.txt']
+# default_location = "/files" #without '/' at the end!
 # file_to = '/dev_test/test.txt'  # The full path to upload the file to, including the file name
+config_file = "./PySyncConf.conf"
 
-class bcolors: #colors
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
-class TransferData:
-    def __init__(self, access_token, default_location):
-        self.access_token = access_token
-        self.default_location = default_location
+class colors: #colors
 
-    def upload_files(self, files, files_to, filenames): #upload a file to Dropbox using API v2
-        print("Starting Upload:\n")
-        dbx = dropbox.Dropbox(self.access_token)
+    BOLD='\033[1m'
+    ITALIC='\033[3m'
+    RED='\033[91m'
+    GREEN='\033[92m'
+    END='\033[0m'
 
-        for file, filename in zip(files, filenames):
-            #print(file, filename)
-            with open(file, 'rb') as f:
-                try:
-                    joinlist = []
-                    joinlist.append(self.default_location)
-                    print("Uploading file: '{}'...".format(file), end='')
-                    filepath_split = file.split("/")
-                    filepath = filepath_split[:-1]
 
-                    if "./" in filepath[0]:
-                        filepath[0] = filepath[0][2:] #delete the './' at the beginning
-                        # print("We have a './'")
-                    else:
-                        filepath[0] = filepath[0][1:] # or only the '/'
-                        # print("We have a '/'")
-                    filepath = list(filter(None, filepath)) #delete empty strings, else it would cause somthing like '///'
+class config():
+    def __init__(self):
+        if ospath.exists(config_file):
+            self.conf_exists = True
+        else:
+            self.conf_exists = False
+            #  print(
+            return self.conf_exists
+        
 
-                    for i in filepath:
-                        joinlist.append(i)
-                    joinlist.append(filename)
-                    # print("Joinlist:\n", joinlist, filepath_split, filepath, file)
-                    files_to = '/'.join(joinlist)
-                    dbx.files_upload(f.read(), files_to) #final upload function
-                    print(bcolors.OKGREEN + "done" + bcolors.ENDC, end='\n')
-                    # print("\n",files_to)
-                except Exception as e:
-                    print(e)
-                    print(bcolors.WARNING + "Couldn't upload file:".format(e) + bcolors.ENDC)
-
-class Scanner():
-    def __init__(self, files):
-        self.scanfor = files
-        self.files = []
-        self.filenames = []
-
-    def scan(self, dest_db):
-        print("Searching for files:\n")
-        for file in self.scanfor:
-            print("Searching for file: '{}'...".format(file), end='')
-            try:
-                open(file, 'r')
-            except FileNotFoundError:
-                print(bcolors.WARNING + "File not found: '{}'".format(file) + bcolors.ENDC)
+    def read_config(self):
+        self.config_list = list()
+        cfile = open(config_file)
+        for line in cfile:
+            if "#" in line:
+                pass # make comments possible
             else:
-                print(bcolors.OKGREEN + "done" + bcolors.ENDC)
-                filename = file.split("/").pop() #splits the full filename and gets the last element from the list
+                self.config_list.append(line)
+        #  print(self.config_list)
+        
+        config_list_tmp = list()
+        for s in self.config_list:
+            config_list_tmp = [s.replace("\n","") for s in self.config_list]
+        config_list_tmp = [x for x in config_list_tmp if x]
+        self.config_list = config_list_tmp
 
-                self.files.append(file)
-                self.filenames.append(filename)
+        #  print(self.config_list)
+        self.configs = dict()
+        self.files = list()
+        for line in self.config_list:
+            key, val = line.split("=")
+            if key == "file":
+                self.files.append(val)
+            else:
+                self.configs[key] = val
+        self.configs["files"] = self.files
+        # print(self.configs)
 
-        print() #just for some space (creates a newline)
-        return self.files, self.filenames
+    def get_config(self):
+        if self.configs["access_token"]:
+            self.auth_token = self.configs["access_token"]
+        else:
+            print(colors.RED + "Please specify a access token in the config file!\nConfig file at: ./PySyncConf.conf" + colors.END)
+        if self.configs["dbx_folder"]:
+            self.dbx_folder = self.configs["dbx_folder"]
+        else:
+            print(colors.RED + "Please specify the destination folder for dropbox in the config file!\nConfig file at: ./PySyncConf.conf" + colors.END)
+        if self.configs["files"]:
+            pass # self.files is already a list with all files
+        else:
+            print(colors.RED + "No files specified! Please specify files in the config file at: ./PySyncConf.conf" + colors.END)
+
+
+def upload(auth_token, dest_folder, files):
+    dbx = dropbox.Dropbox(auth_token)
+    for file in files:
+        try:
+            dest = file.split("/")[-1:]
+            # print(dest[-1:], dest_folder)
+            destination = dest_folder + dest[0]
+            # print(destination)
+            ofile = open(file, "rb")
+            print("Uploading file:\t\t{}...".format(file), end="")
+            dbx.files_upload(ofile.read(), destination)
+            print(colors.GREEN + "done!" + colors.END)
+
+            # metadata = dbx.files_list_folder('/data/')
+            # flist = []
+            # if metadata.has_more == True:
+                # m1 = metadata.entries
+                # cur = metadata.cursor
+                # for i in m1:
+                    # if isinstance(i, dropbox.files.FileMetadata):
+                        # flist.append([i.name, i.size])
+                # m2 = dbx.files_list_folder_continue(cur)
+                # while m2.has_more == True:
+                    # for i in m2.entries:
+                        # if isinstance(i, dropbox.files.FileMetadata):
+                            # flist.append([i.name, i.size])
+                    # cur = m2.cursor
+                    # m2 = dbx.files_list_folder_continue(cur)
+            # print(flist)
+
+        except Exception as e:
+            print(colors.RED + "failed!\n" + str(e) + colors.END)
+
+def check_config():
+    if ospath.exists(config_file):
+        if config():
+            c = config()
+            c.read_config()
+            c.get_config()
+            return True, c
+        else:
+            print(colors.RED + "Could not load config file!" + colors.END)
+    else:
+        print(colors.RED + "Config file is ether not specified or doesn't exits!\nCheck at: ./PySyncConf.conf" + colors.END)
+        return False
+
 
 def main():
-    files_to = '/dev_test/'
-    scanner = Scanner(files_to_sync)
-    files, filenames = scanner.scan(files_to)
-    transferData = TransferData(access_token, default_location)
-    transferData.upload_files(files, files_to, filenames)
+    # files_to = '/dev_test/'
+    # scanner = Scanner(files_to_sync)
+    # files, filenames = scanner.scan(files_to)
+    # transferData = TransferData(access_token, default_location)
+    # transferData.upload_files(files, files_to, filenames)
     # file_from = './test.txt'
     #
     # transferData.upload_file(file_from, file_to)
     # print("Uploadet file!")
+    config_check, config = check_config()
+    if config_check is not True:
+        exit()
+       
+    else: #config file exists, prepare for upload
+        # print(config.files)
+        # print(config.auth_token)
+        # print(config.dbx_folder)
+
+        # files = config.files
+        # auth_token = config.auth_token
+        # dbx_folder = config.dbx_folder
+        print("Going to upload following files:\n\n" + colors.BOLD + "Reading file list from config:\n" + colors.END, end="")
+        for file in config.files:
+            print("\t" + file)
+        dec = str(input("\nUpload files? [y/n]: "))
+        if dec:
+            if dec in ["N", "n", "No", "no"]:
+                print(colors.RED + "\nCanceling upload!\nExiting..." + colors.END)
+                exit()
+            elif dec in ["Y", "y", "Yes", "yes"]:
+                print(colors.GREEN + "Starting Upload..." + colors.END)
+                upload(config.auth_token, config.dbx_folder, config.files)
+                print("Finishing upload\nExiting...")
+                exit()
+            else:
+                print(colors.RED + "\nCanceling upload!\nExiting..." + colors.END)
+                exit()
 
 if __name__ == '__main__':
     main()
